@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct SidebarView: View {
     @Binding var selection: SidebarDestination?
     @EnvironmentObject private var repoStore: RepositoryStore
@@ -94,6 +95,7 @@ struct SidebarView: View {
 
     @ViewBuilder
     private var sidebarBackground: some View {
+        #if compiler(>=6.2)
         if #available(macOS 26, *) {
             Rectangle()
                 .fill(.clear)
@@ -101,6 +103,9 @@ struct SidebarView: View {
         } else {
             Theme.sidebar
         }
+        #else
+        Theme.sidebar
+        #endif
     }
 }
 

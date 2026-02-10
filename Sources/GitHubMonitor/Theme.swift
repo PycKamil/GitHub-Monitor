@@ -43,6 +43,7 @@ extension View {
         fallbackFill: Color = Theme.card,
         fallbackStroke: Color = Theme.border
     ) -> some View {
+        #if compiler(>=6.2)
         if #available(macOS 26, *) {
             glassEffect(.regular.tint(tint).interactive(interactive), in: .rect(cornerRadius: cornerRadius))
         } else {
@@ -55,6 +56,16 @@ extension View {
                     )
             )
         }
+        #else
+        background(
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(fallbackFill)
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .stroke(fallbackStroke, lineWidth: 1)
+                )
+        )
+        #endif
     }
 
     @ViewBuilder
@@ -63,6 +74,7 @@ extension View {
         interactive: Bool = false,
         fallbackFill: Color = Theme.card
     ) -> some View {
+        #if compiler(>=6.2)
         if #available(macOS 26, *) {
             glassEffect(.regular.tint(tint).interactive(interactive), in: .capsule)
         } else {
@@ -71,6 +83,12 @@ extension View {
                     .fill(fallbackFill)
             )
         }
+        #else
+        background(
+            Capsule()
+                .fill(fallbackFill)
+        )
+        #endif
     }
 
     @ViewBuilder
@@ -79,6 +97,7 @@ extension View {
         interactive: Bool = false,
         fallbackFill: Color = Theme.card
     ) -> some View {
+        #if compiler(>=6.2)
         if #available(macOS 26, *) {
             glassEffect(.regular.tint(tint).interactive(interactive), in: .circle)
         } else {
@@ -87,6 +106,12 @@ extension View {
                     .fill(fallbackFill)
             )
         }
+        #else
+        background(
+            Circle()
+                .fill(fallbackFill)
+        )
+        #endif
     }
 
     @ViewBuilder
@@ -96,6 +121,7 @@ extension View {
 
     @ViewBuilder
     func glassSheetRounded(cornerRadius: CGFloat, tint: Color = Theme.sheetTint) -> some View {
+        #if compiler(>=6.2)
         if #available(macOS 26, *) {
             glassEffect(.regular.tint(tint), in: .rect(cornerRadius: cornerRadius))
                 .background(
@@ -105,10 +131,14 @@ extension View {
         } else {
             background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
         }
+        #else
+        background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+        #endif
     }
 
     @ViewBuilder
     func glassSheetBar(tint: Color = Theme.sheetTint) -> some View {
+        #if compiler(>=6.2)
         if #available(macOS 26, *) {
             glassEffect(.regular.tint(tint), in: .rect(cornerRadius: 0))
                 .background(
@@ -118,6 +148,9 @@ extension View {
         } else {
             background(.ultraThinMaterial)
         }
+        #else
+        background(.ultraThinMaterial)
+        #endif
     }
 }
 

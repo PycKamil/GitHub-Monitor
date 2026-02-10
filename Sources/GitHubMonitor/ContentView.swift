@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct ContentView: View {
     @EnvironmentObject private var repoStore: RepositoryStore
     @EnvironmentObject private var gitHub: GitHubService
@@ -7,7 +8,7 @@ struct ContentView: View {
     @State private var selection: SidebarDestination? = .dashboard
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             AppBackground()
             WindowGlassConfigurator()
 
@@ -42,8 +43,33 @@ struct ContentView: View {
                 }
             }
             .navigationSplitViewStyle(.balanced)
+
+            if let message = gitHub.apiErrorMessage {
+                ErrorToast(message: message)
+                    .padding(.top, 16)
+                    .padding(.horizontal, 24)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(1)
+                    .onTapGesture {
+                        withAnimation {
+                            gitHub.apiErrorMessage = nil
+                        }
+                    }
+            }
         }
         .background(Color.clear)
+        .onChange(of: gitHub.apiErrorMessage) { newValue in
+            guard let message = newValue else { return }
+            Task {
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                if gitHub.apiErrorMessage == message {
+                    withAnimation {
+                        gitHub.apiErrorMessage = nil
+                    }
+                }
+            }
+        }
+        .animation(.easeInOut, value: gitHub.apiErrorMessage)
     }
 }
 

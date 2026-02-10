@@ -79,6 +79,26 @@ struct SectionHeader: View {
     }
 }
 
+struct ErrorToast: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(Color.red)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(3)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .glassSurface(cornerRadius: 12, tint: Theme.glassStrongTint, interactive: false, fallbackFill: Theme.card, fallbackStroke: .clear)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.border, lineWidth: 1))
+        .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
+    }
+}
+
 struct FieldBackground: ViewModifier {
     func body(content: Content) -> some View {
         content

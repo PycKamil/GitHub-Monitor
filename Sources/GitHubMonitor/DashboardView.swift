@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct DashboardView: View {
     @EnvironmentObject private var repoStore: RepositoryStore
     @EnvironmentObject private var gitHub: GitHubService

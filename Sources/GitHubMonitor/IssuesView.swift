@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 
+@MainActor
 struct IssuesView: View {
     let repoName: String
     @EnvironmentObject private var monitorData: MonitorData

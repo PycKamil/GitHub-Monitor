@@ -1,6 +1,7 @@
 import SwiftUI
 import Charts
 
+@MainActor
 struct ContributorsView: View {
     let repoName: String
     @EnvironmentObject private var monitorData: MonitorData
@@ -10,10 +11,10 @@ struct ContributorsView: View {
     }
 
     private var weeklyCommits: [ChartBucket] {
-        // Aggregate all contributors' weekly data into single weekly totals
+        let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: Date()) ?? Date()
         var weekMap: [Date: Int] = [:]
         for contributor in contributors {
-            for week in contributor.weeks {
+            for week in contributor.weeks where week.week >= oneYearAgo {
                 weekMap[week.week, default: 0] += week.commits
             }
         }

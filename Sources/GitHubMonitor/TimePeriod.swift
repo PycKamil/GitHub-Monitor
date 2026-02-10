@@ -39,7 +39,7 @@ enum TimePeriod: String, CaseIterable, Identifiable {
         case .monthly:
             return calendar.date(byAdding: .month, value: -12, to: now) ?? now
         case .yearly:
-            return calendar.date(byAdding: .year, value: -5, to: now) ?? now
+            return calendar.date(byAdding: .year, value: -1, to: now) ?? now
         }
     }
 

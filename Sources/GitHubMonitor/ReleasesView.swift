@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 struct ReleasesView: View {
     let repoName: String
     @EnvironmentObject private var monitorData: MonitorData

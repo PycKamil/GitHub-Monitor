@@ -16,5 +16,9 @@ let package = Package(
                 .linkedFramework("AppKit")
             ]
         ),
+        .testTarget(
+            name: "GitHubMonitorTests",
+            dependencies: ["GitHubMonitor"]
+        ),
     ]
 )

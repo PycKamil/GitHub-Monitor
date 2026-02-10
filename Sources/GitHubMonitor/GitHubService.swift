@@ -4,6 +4,7 @@ import Foundation
 final class GitHubService: ObservableObject {
     @Published var isAuthenticated = false
     @Published var authUser = ""
+    @Published var apiErrorMessage: String?
 
     func checkAuth() async {
         let result = await run(["gh", "auth", "status"])
@@ -95,91 +96,79 @@ final class GitHubService: ObservableObject {
     }
 
     // MARK: - Stars
+    
+    nonisolated static func stargazersArguments(repoFullName: String, perPage: Int, page: Int) -> [String] {
+        [
+            "gh", "api", "repos/\(repoFullName)/stargazers?per_page=\(perPage)&page=\(page)",
+            "-H", "Accept: application/vnd.github.star+json",
+            "--jq", ".[].starred_at"
+        ]
+    }
 
     func fetchStarHistory(for repo: Repository) async -> [StarDataPoint] {
-        // Get total star count first
+        // Get total star count to know the last page
         let infoResult = await run(["gh", "api", "repos/\(repo.fullName)", "--jq", ".stargazers_count"])
         let totalStars = Int(infoResult.output.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
         guard totalStars > 0 else { return [] }
 
         let perPage = 100
-        let totalPages = (totalStars + perPage - 1) / perPage
+        let totalPages = max(1, (totalStars + perPage - 1) / perPage)
+        let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: Date()) ?? Date()
 
-        // For repos with <= 5000 stars, fetch all pages; otherwise sample ~50 pages
-        let pagesToFetch: [Int]
-        if totalPages <= 50 {
-            pagesToFetch = Array(1...totalPages)
-        } else {
-            // Sample evenly across all pages
-            let sampleCount = 50
-            pagesToFetch = (0..<sampleCount).map { i in
-                max(1, Int(Double(i) / Double(sampleCount - 1) * Double(totalPages - 1)) + 1)
-            }
-        }
+        // Fetch first ~15 pages (1500 stars max) to cover the past year (newest stars first)
+        let maxPages = min(totalPages, 15)
+        let endPage = maxPages
 
-        // Fetch pages in parallel
-        let allDates: [Date] = await withTaskGroup(of: [Date].self) { group -> [Date] in
-            for page in pagesToFetch {
-                group.addTask {
-                    let result = await self.run([
-                        "gh", "api", "repos/\(repo.fullName)/stargazers?per_page=\(perPage)&page=\(page)",
-                        "-H", "Accept: application/vnd.github.star+json",
-                        "--jq", ".[].starred_at"
-                    ])
-                    let formatter = ISO8601DateFormatter()
-                    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                    let fallback = ISO8601DateFormatter()
-                    return result.output
-                        .split(separator: "\n")
-                        .compactMap { line in
-                            let s = String(line).trimmingCharacters(in: .whitespaces)
-                            return formatter.date(from: s) ?? fallback.date(from: s)
-                        }
+        // Fetch sequentially to avoid overwhelming gh CLI / rate limits
+        var allDates: [Date] = []
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        let fallbackFormatter = ISO8601DateFormatter()
+        fallbackFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        for page in 1...endPage {
+            let result = await run(Self.stargazersArguments(repoFullName: repo.fullName, perPage: perPage, page: page))
+            let dates = result.output
+                .split(separator: "\n")
+                .compactMap { line in
+                    let s = String(line).trimmingCharacters(in: .whitespaces)
+                    return formatter.date(from: s) ?? fallbackFormatter.date(from: s)
                 }
-            }
-            var collected: [Date] = []
-            for await dates in group { collected.append(contentsOf: dates) }
-            return collected
+            allDates.append(contentsOf: dates)
         }
 
-        guard !allDates.isEmpty else { return [] }
-        let sorted = allDates.sorted()
-
-        // Group by month and build cumulative curve
         let cal = Calendar.current
+        guard !allDates.isEmpty else { return [] }
+        let filtered = allDates.filter { $0 >= oneYearAgo }.sorted()
+
+        let starsBeforeWindow = totalStars - filtered.count
+
+        // Build month buckets for the last year, even when some months have 0 stars
+        let startMonth = cal.date(from: cal.dateComponents([.year, .month], from: oneYearAgo)) ?? oneYearAgo
+        let endMonth = cal.date(from: cal.dateComponents([.year, .month], from: Date())) ?? Date()
+        var monthCounts: [Date: Int] = [:]
+        for date in filtered {
+            let key = cal.date(from: cal.dateComponents([.year, .month], from: date)) ?? date
+            monthCounts[key, default: 0] += 1
+        }
+
         var monthBuckets: [(date: Date, count: Int)] = []
-        var currentMonth: DateComponents?
-        var countInMonth = 0
-
-        for date in sorted {
-            let comps = cal.dateComponents([.year, .month], from: date)
-            if comps != currentMonth {
-                if let prev = currentMonth,
-                   let d = cal.date(from: prev) {
-                    monthBuckets.append((d, countInMonth))
-                }
-                currentMonth = comps
-                countInMonth = 0
-            }
-            countInMonth += 1
-        }
-        if let last = currentMonth, let d = cal.date(from: last) {
-            monthBuckets.append((d, countInMonth))
+        var current = startMonth
+        while current <= endMonth {
+            monthBuckets.append((date: current, count: monthCounts[current, default: 0]))
+            guard let next = cal.date(byAdding: .month, value: 1, to: current) else { break }
+            current = next
         }
 
-        // Build cumulative data points
-        var cumulative = 0
-        // If we sampled, scale each bucket proportionally
-        let scale = totalPages <= 50 ? 1.0 : Double(totalStars) / Double(allDates.count)
+        var cumulative = starsBeforeWindow
         var points: [StarDataPoint] = []
         for bucket in monthBuckets {
-            cumulative += Int(Double(bucket.count) * scale)
-            points.append(StarDataPoint(date: bucket.date, cumulativeCount: min(cumulative, totalStars)))
+            cumulative += bucket.count
+            points.append(StarDataPoint(date: bucket.date, cumulativeCount: cumulative))
         }
         // Ensure the last point matches actual total
-        if var last = points.last {
-            last = StarDataPoint(date: last.date, cumulativeCount: totalStars)
-            points[points.count - 1] = last
+        if !points.isEmpty {
+            points[points.count - 1] = StarDataPoint(date: points.last!.date, cumulativeCount: totalStars)
         }
         return points
     }
@@ -387,9 +376,8 @@ final class GitHubService: ObservableObject {
                 process.arguments = ["-lc", escaped]
 
                 let pipe = Pipe()
-                let errPipe = Pipe()
                 process.standardOutput = pipe
-                process.standardError = errPipe
+                process.standardError = pipe
 
                 do {
                     try process.run()
@@ -404,7 +392,16 @@ final class GitHubService: ObservableObject {
                 process.waitUntilExit()
 
                 let output = String(decoding: data, as: UTF8.self)
-                continuation.resume(returning: ProcessResult(output: output, exitCode: process.terminationStatus))
+                let exitCode = process.terminationStatus
+                if exitCode != 0 {
+                    let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let firstLine = trimmed.split(separator: "\n").first.map(String.init)
+                    let message = (firstLine?.isEmpty == false) ? firstLine! : "GitHub API request failed."
+                    Task { @MainActor in
+                        self.apiErrorMessage = message
+                    }
+                }
+                continuation.resume(returning: ProcessResult(output: output, exitCode: exitCode))
             }
         }
     }
