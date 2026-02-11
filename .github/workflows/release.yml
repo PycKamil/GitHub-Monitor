@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 1.0.0)'
+        description: "Version to release (e.g., 1.0.0)"
         required: true
         type: string
 
@@ -15,63 +15,63 @@ permissions:
 jobs:
   release:
     name: Build and Release
-    runs-on: macos-26-arm64
-    
+    runs-on: macos-26
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Setup Swift
-      uses: swift-actions/setup-swift@v2
-      with:
-        swift-version: '6.2'
-    
-    - name: Build release binary
-      run: |
-        swift build -c release
-        cp .build/release/GitHubMonitor ./GitHubMonitor
-    
-    - name: Create release archive
-      run: |
-        zip -r GitHubMonitor-${{ inputs.version }}-macos.zip GitHubMonitor
-    
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v${{ inputs.version }}
-        release_name: Release v${{ inputs.version }}
-        draft: false
-        prerelease: false
-    
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./GitHubMonitor-${{ inputs.version }}-macos.zip
-        asset_name: GitHubMonitor-${{ inputs.version }}-macos.zip
-        asset_content_type: application/zip
-    
-    - name: Bump version in Package.swift
-      run: |
-        # This is a placeholder - adjust based on your versioning strategy
-        echo "Version bumped to ${{ inputs.version }}" > VERSION.txt
-    
-    - name: Create version bump PR
-      uses: peter-evans/create-pull-request@v6
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        commit-message: 'chore: bump version to ${{ inputs.version }}'
-        title: 'chore: bump version to ${{ inputs.version }}'
-        body: |
-          Automated version bump after release v${{ inputs.version }}
-          
-          - Release: https://github.com/${{ github.repository }}/releases/tag/v${{ inputs.version }}
-        branch: version-bump-${{ inputs.version }}
-        base: main
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
+
+      - name: Build release binary
+        run: |
+          swift build -c release
+          cp .build/release/GitHubMonitor ./GitHubMonitor
+
+      - name: Create release archive
+        run: |
+          zip -r GitHubMonitor-${{ inputs.version }}-macos.zip GitHubMonitor
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ inputs.version }}
+          release_name: Release v${{ inputs.version }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./GitHubMonitor-${{ inputs.version }}-macos.zip
+          asset_name: GitHubMonitor-${{ inputs.version }}-macos.zip
+          asset_content_type: application/zip
+
+      - name: Bump version in Package.swift
+        run: |
+          # This is a placeholder - adjust based on your versioning strategy
+          echo "Version bumped to ${{ inputs.version }}" > VERSION.txt
+
+      - name: Create version bump PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: bump version to ${{ inputs.version }}"
+          title: "chore: bump version to ${{ inputs.version }}"
+          body: |
+            Automated version bump after release v${{ inputs.version }}
+
+            - Release: https://github.com/${{ github.repository }}/releases/tag/v${{ inputs.version }}
+          branch: version-bump-${{ inputs.version }}
+          base: main
